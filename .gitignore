@@ -16,3 +16,5 @@ serviceAccountKey.json
 # 운영체제 파일
 .DS_Store
 Thumbs.db
+
+/serviceAccountKey.json
