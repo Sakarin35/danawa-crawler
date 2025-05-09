@@ -72,48 +72,52 @@ export async function crawlDanawa() {
         const product = limitedProducts[i];
         console.log(`[${i+1}/${limitedProducts.length}] ${product.name} 처리 중...`);
         
-        // 상세 페이지 열기
-        const detailPage = await browser.newPage();
-        await detailPage.setUserAgent(CRAWL_CONFIG.USER_AGENT);
-        await detailPage.goto(product.url, { waitUntil: 'networkidle2' });
-        
-        // 상세 정보 추출
-        const details = await detailPage.evaluate(() => {
-          // 스펙 정보 추출
-          const specRows = Array.from(document.querySelectorAll('.spec_tbl tr'));
-          const specs = specRows.map(row => {
-            const title = row.querySelector('th')?.textContent?.trim() || '';
-            const value = row.querySelector('td')?.textContent?.trim() || '';
-            return `${title}: ${value}`;
-          }).join('\n');
+        try {
+          // 상세 페이지 열기
+          const detailPage = await browser.newPage();
+          await detailPage.setUserAgent(CRAWL_CONFIG.USER_AGENT);
+          await detailPage.goto(product.url, { waitUntil: 'networkidle2' });
           
-          // 상세 설명 추출
-          const description = document.querySelector('.detail_cont')?.textContent?.trim() || '';
+          // 상세 정보 추출
+          const details = await detailPage.evaluate(() => {
+            // 스펙 정보 추출
+            const specRows = Array.from(document.querySelectorAll('.spec_tbl tr'));
+            const specs = specRows.map(row => {
+              const title = row.querySelector('th')?.textContent?.trim() || '';
+              const value = row.querySelector('td')?.textContent?.trim() || '';
+              return `${title}: ${value}`;
+            }).join('\n');
+            
+            // 상세 설명 추출
+            const description = document.querySelector('.detail_cont')?.textContent?.trim() || '';
+            
+            return { specs, description };
+          }) as ProductDetails;
           
-          return { specs, description };
-        }) as ProductDetails;
-        
-        // 제품 ID 생성
-        const productId = generateProductId(product.name);
-        
-        // 컴포넌트 데이터 구성 (이미지 URL 그대로 사용)
-        const componentData: ComponentData = {
-          id: productId,
-          name: product.name,
-          price: product.price,
-          image: product.image, // 다나와 이미지 URL 그대로 사용
-          description: details.description.substring(0, 1000), // 설명 길이 제한
-          specs: details.specs,
-          url: product.url,
-          category: category,
-          createdAt: new Date()
-        };
-        
-        // Firebase에 저장
-        await saveComponent(componentData);
-        
-        // 상세 페이지 닫기
-        await detailPage.close();
+          // 제품 ID 생성
+          const productId = generateProductId(product.name);
+          
+          // 컴포넌트 데이터 구성 (이미지 URL 그대로 사용)
+          const componentData: ComponentData = {
+            id: productId,
+            name: product.name,
+            price: product.price,
+            image: product.image, // 다나와 이미지 URL 그대로 사용
+            description: details.description.substring(0, 1000), // 설명 길이 제한
+            specs: details.specs,
+            url: product.url,
+            category: category,
+            createdAt: new Date()
+          };
+          
+          // Firebase에 저장
+          await saveComponent(componentData);
+          
+          // 상세 페이지 닫기
+          await detailPage.close();
+        } catch (error) {
+          console.error(`제품 처리 중 오류 발생: ${product.name}`, error);
+        }
         
         // 서버 부하 방지를 위한 지연
         await delay(CRAWL_CONFIG.DELAY_BETWEEN_PRODUCTS);

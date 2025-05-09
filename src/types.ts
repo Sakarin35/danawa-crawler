@@ -1,8 +1,9 @@
 // src/types.ts
-// 컴포넌트 타입 정의 (대문자로 시작하는 형태로 수정)
+
+// 컴포넌트 타입 정의
 export type ComponentType = 'Vga' | 'Cpu' | 'M.B' | 'Memory' | 'SSD' | 'Case' | 'Cooler' | 'Power';
 
-// 나머지 인터페이스는 그대로 유지
+// 컴포넌트 데이터 인터페이스
 export interface ComponentData {
   id: string;
   name: string;
@@ -15,6 +16,7 @@ export interface ComponentData {
   createdAt: Date;
 }
 
+// 제품 목록 아이템 인터페이스
 export interface ProductListItem {
   name: string;
   price: number;
@@ -22,6 +24,7 @@ export interface ProductListItem {
   url: string;
 }
 
+// 제품 상세 정보 인터페이스
 export interface ProductDetails {
   specs: string;
   description: string;

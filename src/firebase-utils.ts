@@ -7,6 +7,7 @@ import * as path from 'path';
 
 let db: Firestore;
 
+// Firebase 초기화 함수
 export function initFirebase() {
   try {
     // 서비스 계정 키 가져오기
