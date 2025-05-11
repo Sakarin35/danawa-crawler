@@ -1,29 +1,35 @@
 {
   "name": "danawa-crawler",
   "version": "1.0.0",
-  "description": "다나와 PC 부품 크롤러",
-  "main": "dist/index.js",
+  "description": "다나와 웹사이트 크롤러",
+  "main": "index.js",
   "scripts": {
+    "start": "ts-node src/index.ts",
+    "crawl": "ts-node src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
-    "crawl": "ts-node src/index.ts"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [
-    "crawler",
-    "danawa",
-    "pc-parts"
-  ],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "dotenv": "^16.5.0",
     "firebase-admin": "^11.11.1",
-    "puppeteer": "^21.11.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.17.46",
+    "selenium-webdriver": "^4.32.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
-  }
+  },
+  "devDependencies": {
+    "@types/dotenv": "^8.2.0",
+    "@types/node": "^20.17.46",
+    "@types/selenium-webdriver": "^4.1.28"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sakarin35/danawa-crawler.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Sakarin35/danawa-crawler/issues"
+  },
+  "homepage": "https://github.com/Sakarin35/danawa-crawler#readme"
 }

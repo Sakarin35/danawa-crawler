@@ -1,82 +1,67 @@
-// src/firebase-utils.ts
-import { initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { ComponentData } from './types';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as admin from "firebase-admin"
+import type { ComponentData } from "./types"
 
-let db: Firestore;
+let firebaseInitialized = false
 
 // Firebase 초기화 함수
-export function initFirebase() {
+export function initFirebase(): boolean {
   try {
-    // 서비스 계정 키 가져오기
-    let serviceAccount;
-    if (process.env.FIREBASE_PRIVATE_KEY) {
-      serviceAccount = JSON.parse(process.env.FIREBASE_PRIVATE_KEY);
-    } else {
-      const keyPath = path.resolve(__dirname, '../serviceAccountKey.json');
-      if (fs.existsSync(keyPath)) {
-        serviceAccount = require(keyPath);
-      } else {
-        throw new Error('Firebase 서비스 계정 키를 찾을 수 없습니다.');
-      }
+    // 이미 초기화되었는지 확인
+    if (firebaseInitialized) {
+      return true
     }
 
-    initializeApp({
-      credential: cert(serviceAccount)
-    });
+    // 환경 변수에서 Firebase 설정 가져오기
+    const projectId = process.env.FIREBASE_PROJECT_ID
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n")
 
-    db = getFirestore();
-    console.log('Firebase 초기화 완료');
-    return true;
+    if (!projectId || !clientEmail || !privateKey) {
+      console.error("Firebase 환경 변수가 설정되지 않았습니다.")
+      return false
+    }
+
+    // Firebase Admin SDK 초기화
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+    })
+
+    console.log("Firebase 초기화 성공")
+    firebaseInitialized = true
+    return true
   } catch (error) {
-    console.error('Firebase 초기화 실패:', error);
-    return false;
+    console.error("Firebase 초기화 오류:", error)
+    return false
   }
 }
 
-// 컴포넌트 저장 함수
-export async function saveComponent(component: ComponentData): Promise<boolean> {
+// 컴포넌트 데이터 저장 함수
+export async function saveComponentData(data: ComponentData): Promise<void> {
   try {
-    // 'crawled_components' 컬렉션 아래에 각 카테고리별로 문서를 저장
-    const collectionName = 'crawled_components';
-    
-    // 카테고리별 하위 컬렉션 사용
-    const categoryRef = db.collection(collectionName).doc(component.category);
-    const itemRef = categoryRef.collection('items').doc(component.id);
-    
-    // 카테고리 문서가 없으면 생성
-    const categoryDoc = await categoryRef.get();
-    if (!categoryDoc.exists) {
-      await categoryRef.set({
-        name: component.category,
-        createdAt: new Date()
-      });
+    if (!firebaseInitialized) {
+      console.error("Firebase가 초기화되지 않았습니다.")
+      return
     }
-    
-    // 기존 데이터가 있는지 확인
-    const doc = await itemRef.get();
-    
-    if (doc.exists) {
-      // 기존 데이터가 있으면 업데이트
-      await itemRef.update({
-        ...component,
-        updatedAt: new Date()
-      });
-      console.log(`✅ ${component.name} 업데이트 완료`);
-    } else {
-      // 새 데이터 추가
-      await itemRef.set({
-        ...component,
-        createdAt: new Date()
-      });
-      console.log(`✅ ${component.name} 저장 완료`);
+
+    const db = admin.firestore()
+
+    // 컴포넌트 타입별 컬렉션에 저장
+    const componentRef = db.collection(`components/${data.category}/items`).doc()
+
+    // Firestore에 저장할 데이터 준비 (Date 객체를 Timestamp로 변환)
+    const firestoreData = {
+      ...data,
+      id: componentRef.id, // Firestore 문서 ID 사용
+      createdAt: admin.firestore.Timestamp.fromDate(data.createdAt),
     }
-    
-    return true;
+
+    await componentRef.set(firestoreData)
+    console.log(`컴포넌트 데이터 저장 완료: ${data.name} (${data.category})`)
   } catch (error) {
-    console.error(`❌ ${component.name} 저장 실패:`, error);
-    return false;
+    console.error("컴포넌트 데이터 저장 오류:", error)
   }
 }
