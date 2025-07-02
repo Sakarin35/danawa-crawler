@@ -16,6 +16,31 @@ if (!fs.existsSync(DEBUG_DIR)) {
 // 카테고리별 제품 정보를 저장할 객체
 const categoryProducts: Record<ComponentType, ComponentData[]> = {} as Record<ComponentType, ComponentData[]>
 
+// 이미지 URL 크기 조정 함수
+function adjustImageSize(imageUrl: string, size: number = 500): string {
+  if (!imageUrl) return imageUrl
+  
+  try {
+    // 다나와 이미지 URL 형식: https://img.danawa.com/prod_img/...?shrink=330:*&_v=...
+    if (imageUrl.includes('danawa.com') && imageUrl.includes('shrink=')) {
+      // 기존 shrink 파라미터를 새로운 크기로 교체
+      return imageUrl.replace(/shrink=\d+:\*/, `shrink=${size}:*`)
+    }
+    
+    // 다나와 이미지이지만 shrink 파라미터가 없는 경우
+    if (imageUrl.includes('danawa.com')) {
+      const separator = imageUrl.includes('?') ? '&' : '?'
+      return `${imageUrl}${separator}shrink=${size}:*`
+    }
+    
+    // 다나와가 아닌 다른 이미지 URL은 그대로 반환
+    return imageUrl
+  } catch (error) {
+    console.error("이미지 URL 크기 조정 중 오류:", error)
+    return imageUrl
+  }
+}
+
 // 제품 정보를 카테고리별 배열에 추가하는 함수
 function addProductToCategory(componentData: ComponentData): void {
   const category = componentData.category
@@ -25,6 +50,33 @@ function addProductToCategory(componentData: ComponentData): void {
   }
   
   categoryProducts[category].push(componentData)
+}
+
+// 특정 카테고리의 제품 정보를 텍스트 파일로 저장하는 함수
+function saveCategoryToFile(category: ComponentType): void {
+  if (!categoryProducts[category] || categoryProducts[category].length === 0) {
+    console.log(`${category} 카테고리에 저장할 제품이 없습니다.`)
+    return
+  }
+  
+  const filePath = path.join(DEBUG_DIR, `${category}.txt`)
+  let fileContent = ""
+  
+  // 각 제품 정보를 텍스트로 변환
+  categoryProducts[category].forEach((product, index) => {
+    fileContent += `제품명: ${product.name}\n`
+    fileContent += `가격: ${product.price.toLocaleString()}원\n`
+    fileContent += `이미지 링크: ${product.image}\n`
+    
+    // 마지막 제품이 아니면 빈 줄 추가
+    if (index < categoryProducts[category].length - 1) {
+      fileContent += "\n"
+    }
+  })
+  
+  // 파일 저장
+  fs.writeFileSync(filePath, fileContent, 'utf8')
+  console.log(`${category} 카테고리 제품 ${categoryProducts[category].length}개 정보 저장 완료: ${filePath}`)
 }
 
 // 모든 제품 정보를 카테고리별 텍스트 파일로 저장하는 함수
@@ -357,7 +409,7 @@ async function extractProducts(driver: WebDriver): Promise<ProductListItem[]> {
             for (const attr of srcAttrs) {
               const src = await imageElements[0].getAttribute(attr)
               if (src && src !== "") {
-                image = src
+                image = adjustImageSize(src, 500) // 이미지 크기 500으로 조정
                 break
               }
             }
@@ -383,6 +435,27 @@ async function extractProducts(driver: WebDriver): Promise<ProductListItem[]> {
   
   try {
     const extractedProducts = await driver.executeScript<ProductListItem[]>(() => {
+      // JavaScript 내부에서 사용할 이미지 크기 조정 함수
+      function adjustImageSizeJS(imageUrl: string, size: number = 500): string {
+        if (!imageUrl) return imageUrl
+        
+        try {
+          if (imageUrl.includes('danawa.com') && imageUrl.includes('shrink=')) {
+            return imageUrl.replace(/shrink=\d+:\*/, `shrink=${size}:*`)
+          }
+          
+          if (imageUrl.includes('danawa.com')) {
+            const separator = imageUrl.includes('?') ? '&' : '?'
+            return `${imageUrl}${separator}shrink=${size}:*`
+          }
+          
+          return imageUrl
+        } catch (error) {
+          console.error("이미지 URL 크기 조정 중 오류:", error)
+          return imageUrl
+        }
+      }
+      
       const items: Array<{
         name: string
         price: number
@@ -470,7 +543,7 @@ async function extractProducts(driver: WebDriver): Promise<ProductListItem[]> {
               for (const attr of srcAttrs) {
                 const src = imageElement.getAttribute(attr)
                 if (src && src !== "") {
-                  image = src
+                  image = adjustImageSizeJS(src, 500) // 이미지 크기 500으로 조정
                   break
                 }
               }
@@ -548,13 +621,13 @@ async function extractProductDetails(
       if (imageElements.length > 0) {
         const src = await imageElements[0].getAttribute("src")
         if (src && src !== "") {
-          imageUrl = src
+          imageUrl = adjustImageSize(src, 500) // 이미지 크기 500으로 조정
           break
         }
         
         const dataSrc = await imageElements[0].getAttribute("data-src")
         if (dataSrc && dataSrc !== "") {
-          imageUrl = dataSrc
+          imageUrl = adjustImageSize(dataSrc, 500) // 이미지 크기 500으로 조정
           break
         }
       }
@@ -821,6 +894,10 @@ export async function crawlDanawa(): Promise<void> {
         // 제품 간 딜레이
         await driver.sleep(1000)
       }
+      
+      // 카테고리 크롤링 완료 후 바로 텍스트 파일 저장
+      saveCategoryToFile(category)
+      console.log(`${category} 카테고리 크롤링 완료 및 텍스트 파일 저장 완료`)
     }
     
     // 모든 카테고리 크롤링 완료 후 카테고리별 텍스트 파일 저장
